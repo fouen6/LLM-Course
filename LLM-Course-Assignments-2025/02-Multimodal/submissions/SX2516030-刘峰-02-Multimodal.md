@@ -1,0 +1,37 @@
+[toc]
+
+> 本次LLM课程大作业选择实现多模态大模型的视觉问答，以下是关于实现的迭代步骤以及相关细节叙述
+>
+> 所有的代码实现将在下面这个仓库：
+>
+> [fouen6/Multimodal-for-VQA](https://github.com/fouen6/Multimodal-for-VQA)
+
+
+
+# Multimodal for VQA
+
+> date：2025-12-30
+>
+> Implement functionality：完成环境的搭建以及数据集的下载和相关预处理工作！！！
+
+## 数据集介绍以及预处理
+
+### 下载相关数据
+
+| AI Challenger                                              | COCO                                                         | complex_reasoning_77k.json                                   | detail_23k.json                                              |
+| ---------------------------------------------------------- | ------------------------------------------------------------ | ------------------------------------------------------------ | ------------------------------------------------------------ |
+| [AI Challenger](https://tianchi.aliyun.com/dataset/145781) | [COCO 2017](http://images.cocodataset.org/zips/train2017.zip) | [complex_reasoning_77k.json](https://huggingface.co/datasets/liuhaotian/LLaVA-Instruct-150K/resolve/main/complex_reasoning_77k.json) | [detail_23k.json](https://huggingface.co/datasets/liuhaotian/LLaVA-Instruct-150K/resolve/main/detail_23k.json) |
+
+在下载完成之后按照 `config.yaml`中的路径存放数据集。
+
+数据下载完毕后，使用 `process_image.py` 进行预处理。
+
+### 数据集处理(process_image.py)
+
+训练集采用阿里数据集（ali）和 COCO 数据集（两个文件）的图文标注数据，预处理任务的核心是将两种格式不一致的原始图文标注 JSON 文件，转换为统一规范的问答式标注数据和图像信息映射数据，最终合并所有数据集结果并保存为新的 JSON 文件，为后续多模态模型（图文问答）提供可直接使用的规整数据。
+
+1. **配置与数据读取**：先通过`yaml`读取`config.yaml`配置文件，获取所有输入（阿里 / COCO 标注文件路径、图像存储路径）和输出文件路径；再通过封装的`read_json`函数，分别读取阿里数据集和两个 COCO 数据集的原始 JSON 标注数据。
+2. 分数据集标准化处理：
+   - 调用`process_ali`函数处理阿里数据集：兼容灵活的字段格式（支持`image_id`/`image`、`caption`/`conversations`字段），对多标注列表随机选一句，再 50% 概率随机切换两种提问模板，生成统一格式问答对，并建立图像名与图像信息（ID、路径）的映射，ID 从 0 开始。
+   - 调用`process_coco`函数依次处理两个 COCO 数据集：针对固定对话式标注格式，提取问题和答案，将问题中的`<image>`占位符统一替换为`<|extra_0|>`，答案封装为列表格式；通过递增`start_ID`（基于前序数据集的图像数量）保证 ID 全局唯一，同时生成对应图像信息映射。
+3. **数据合并与保存**：使用字典解包语法合并三个数据集的图像信息映射和问答标注数据，打印各数据集及总数据规模；最后将合并后的两类数据分别以 UTF-8 编码、格式化输出的方式保存为指定的 JSON 文件，完成整个预处理流程。
